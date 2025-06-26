@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
+import 'package:warmindo_app/data/model/menu_model.dart';
 import 'package:warmindo_app/data/repository/menu_repository.dart';
 import '../auth/auth_bloc.dart';
 
