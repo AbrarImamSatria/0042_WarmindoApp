@@ -1,5 +1,6 @@
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
+import 'package:warmindo_app/data/model/transaksi_model.dart';
 import 'package:warmindo_app/data/repository/item_transaksi_repository.dart';
 import 'package:warmindo_app/data/repository/transaksi_repository.dart';
 import '../auth/auth_bloc.dart';
