@@ -93,9 +93,8 @@ class DatabaseHelper {
     await _insertDefaultData(db);
   }
 
-  
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    
+    // Handle database migrations here if needed
   }
 
   Future<void> _insertDefaultData(Database db) async {
@@ -103,9 +102,11 @@ class DatabaseHelper {
     await db.insert(tablePengguna, {
       'nama': 'Pemilik',
       'password': '123456', 
+      'role': 'pemilik',
       'alamat': null,
     });
 
+    // Insert default karyawan account
     await db.insert(tablePengguna, {
       'nama': 'Karyawan',
       'password': '123456', 
@@ -113,6 +114,7 @@ class DatabaseHelper {
       'alamat': null,
     });
 
+    // Insert sample menu items
     final menuItems = [
       // Makanan
       {
@@ -176,6 +178,11 @@ class DatabaseHelper {
     }
   }
 
+  // Database utility methods
+  Future<String> getDatabasePath() async {
+    return join(await getDatabasesPath(), _databaseName);
+  }
+
   Future<void> closeDatabase() async {
     final db = await database;
     await db.close();
@@ -188,6 +195,7 @@ class DatabaseHelper {
     _database = null;
   }
 
+  // Check if database exists
   Future<bool> databaseExists() async {
     final path = join(await getDatabasesPath(), _databaseName);
     return await databaseFactory.databaseExists(path);
