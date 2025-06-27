@@ -309,14 +309,24 @@ class ReportBloc extends Bloc<ReportEvent, ReportState> {
       }
 
       // Save Excel file
-      final directory = await getApplicationDocumentsDirectory();
-      final excelDir = Directory('${directory.path}/reports');
+      Directory? excelDir;
+      if (Platform.isAndroid) {
+        // Android: /storage/emulated/0/Documents/WarmindoApp/Reports
+        final externalDir = await getExternalStorageDirectory();
+        final documentsPath = externalDir!.path.split('Android')[0];
+        excelDir = Directory('${documentsPath}Documents/WarmindoApp/Reports');
+      } else {
+        // iOS: Use application documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        excelDir = Directory('${directory.path}/reports');
+      }
+      
       if (!await excelDir.exists()) {
         await excelDir.create(recursive: true);
       }
 
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
-      final fileName = 'Laporan_${event.startDate.toIso8601String().split('T')[0]}_to_${event.endDate.toIso8601String().split('T')[0]}_$timestamp.xlsx';
+      final fileName = 'Laporan_Warmindo_${event.startDate.toIso8601String().split('T')[0]}_to_${event.endDate.toIso8601String().split('T')[0]}.xlsx';
       final filePath = '${excelDir.path}/$fileName';
       
       File(filePath)
@@ -325,7 +335,7 @@ class ReportBloc extends Bloc<ReportEvent, ReportState> {
 
       emit(ReportExcelGenerated(
         filePath: filePath,
-        message: 'File Excel berhasil dibuat',
+        message: 'File Excel berhasil dibuat di: ${excelDir.path}',
       ));
     } catch (e) {
       emit(ReportFailure(error: e.toString()));

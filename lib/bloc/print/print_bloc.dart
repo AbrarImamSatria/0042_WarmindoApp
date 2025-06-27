@@ -121,9 +121,19 @@ class PrintBloc extends Bloc<PrintEvent, PrintState> {
         ),
       );
 
-      // Save to file
-      final directory = await getApplicationDocumentsDirectory();
-      final notaDir = Directory('${directory.path}/nota');
+      // Save to external storage
+      Directory? notaDir;
+      if (Platform.isAndroid) {
+        // Android: /storage/emulated/0/Documents/WarmindoApp/Nota
+        final externalDir = await getExternalStorageDirectory();
+        final documentsPath = externalDir!.path.split('Android')[0];
+        notaDir = Directory('${documentsPath}Documents/WarmindoApp/Nota');
+      } else {
+        // iOS: Use application documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        notaDir = Directory('${directory.path}/nota');
+      }
+      
       if (!await notaDir.exists()) {
         await notaDir.create(recursive: true);
       }
@@ -134,7 +144,7 @@ class PrintBloc extends Bloc<PrintEvent, PrintState> {
 
       emit(PrintPDFGenerated(
         filePath: filePath,
-        message: 'PDF berhasil dibuat',
+        message: 'PDF berhasil dibuat di: ${notaDir.path}',
       ));
     } catch (e) {
       emit(PrintFailure(error: e.toString()));

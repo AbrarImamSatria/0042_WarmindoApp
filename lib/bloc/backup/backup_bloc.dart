@@ -47,23 +47,33 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
       final dbPath = await _databaseHelper.getDatabasePath();
       final dbFile = File(dbPath);
       
-      // Get backup directory
-      final directory = await getApplicationDocumentsDirectory();
-      final backupDir = Directory('${directory.path}/backups');
+      // Get external storage directory (Documents folder)
+      Directory? backupDir;
+      if (Platform.isAndroid) {
+        // Android: /storage/emulated/0/Documents/WarmindoApp/Backups
+        final externalDir = await getExternalStorageDirectory();
+        final documentsPath = externalDir!.path.split('Android')[0];
+        backupDir = Directory('${documentsPath}Documents/WarmindoApp/Backups');
+      } else {
+        // iOS: Use application documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        backupDir = Directory('${directory.path}/backups');
+      }
+      
       if (!await backupDir.exists()) {
         await backupDir.create(recursive: true);
       }
 
       // Create backup filename with timestamp
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final backupPath = '${backupDir.path}/backup_$timestamp.db';
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
+      final backupPath = '${backupDir.path}/backup_warmindo_$timestamp.db';
       
       // Copy database file
       await dbFile.copy(backupPath);
 
       emit(BackupSuccess(
         backupPath: backupPath,
-        message: 'Backup berhasil dibuat',
+        message: 'Backup berhasil dibuat di: ${backupDir.path}',
       ));
     } catch (e) {
       emit(BackupFailure(error: e.toString()));
@@ -158,15 +168,25 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
         }
       };
 
-      // Save to file
-      final directory = await getApplicationDocumentsDirectory();
-      final exportDir = Directory('${directory.path}/exports');
+      // Get external storage directory
+      Directory? exportDir;
+      if (Platform.isAndroid) {
+        // Android: /storage/emulated/0/Documents/WarmindoApp/Exports
+        final externalDir = await getExternalStorageDirectory();
+        final documentsPath = externalDir!.path.split('Android')[0];
+        exportDir = Directory('${documentsPath}Documents/WarmindoApp/Exports');
+      } else {
+        // iOS: Use application documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        exportDir = Directory('${directory.path}/exports');
+      }
+      
       if (!await exportDir.exists()) {
         await exportDir.create(recursive: true);
       }
 
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-      final exportPath = '${exportDir.path}/export_$timestamp.json';
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
+      final exportPath = '${exportDir.path}/export_warmindo_$timestamp.json';
       final exportFile = File(exportPath);
       
       await exportFile.writeAsString(
@@ -175,7 +195,7 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
 
       emit(BackupSuccess(
         backupPath: exportPath,
-        message: 'Data berhasil diexport ke JSON',
+        message: 'Data berhasil diexport ke: ${exportDir.path}',
       ));
     } catch (e) {
       emit(BackupFailure(error: e.toString()));
