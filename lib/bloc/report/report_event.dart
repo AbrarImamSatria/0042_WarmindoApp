@@ -49,3 +49,21 @@ final class ReportExportData extends ReportEvent {
     required this.endDate,
   });
 }
+// Generate Excel file
+final class ReportGenerateExcel extends ReportEvent {
+  final DateTime startDate;
+  final DateTime endDate;
+  final bool includeTransactions;
+  final bool includeSalesByMenu;
+  final bool includeDailyRevenue;
+  final bool includePaymentStats;
+
+  ReportGenerateExcel({
+    required this.startDate,
+    required this.endDate,
+    this.includeTransactions = true,
+    this.includeSalesByMenu = true,
+    this.includeDailyRevenue = true,
+    this.includePaymentStats = true,
+  });
+}

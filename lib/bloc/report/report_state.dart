@@ -59,6 +59,16 @@ final class ReportExportReady extends ReportState {
     required this.endDate,
   });
 }
+// Excel generated
+final class ReportExcelGenerated extends ReportState {
+  final String filePath;
+  final String message;
+
+  ReportExcelGenerated({
+    required this.filePath,
+    required this.message,
+  });
+}
 
 // Failure state
 final class ReportFailure extends ReportState {
