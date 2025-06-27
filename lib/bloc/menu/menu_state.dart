@@ -20,6 +20,17 @@ final class MenuSuccess extends MenuState {
   });
 }
 
+// Image picked state
+final class MenuImagePicked extends MenuState {
+  final String imagePath;
+  final int? menuId;
+
+  MenuImagePicked({
+    required this.imagePath,
+    this.menuId,
+  });
+}
+
 // Failure state
 final class MenuFailure extends MenuState {
   final String error;

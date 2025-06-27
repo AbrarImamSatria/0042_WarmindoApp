@@ -1,7 +1,11 @@
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:warmindo_app/data/model/menu_model.dart';
 import 'package:warmindo_app/data/repository/menu_repository.dart';
+import 'dart:io';
 import '../auth/auth_bloc.dart';
 
 part 'menu_event.dart';
@@ -10,6 +14,7 @@ part 'menu_state.dart';
 class MenuBloc extends Bloc<MenuEvent, MenuState> {
   final MenuRepository _menuRepository = MenuRepository();
   final AuthBloc _authBloc;
+  final ImagePicker _imagePicker = ImagePicker();
 
   MenuBloc({required AuthBloc authBloc}) 
     : _authBloc = authBloc,
@@ -20,6 +25,8 @@ class MenuBloc extends Bloc<MenuEvent, MenuState> {
     on<MenuAdd>(_onMenuAdd);
     on<MenuUpdate>(_onMenuUpdate);
     on<MenuUpdateFoto>(_onMenuUpdateFoto);
+    on<MenuPickImageFromCamera>(_onPickImageFromCamera);
+    on<MenuPickImageFromGallery>(_onPickImageFromGallery);
     on<MenuDelete>(_onMenuDelete);
   }
 
@@ -125,6 +132,105 @@ class MenuBloc extends Bloc<MenuEvent, MenuState> {
     } catch (e) {
       emit(MenuFailure(error: e.toString()));
     }
+  }
+
+  // Pick image from camera
+  Future<void> _onPickImageFromCamera(MenuPickImageFromCamera event, Emitter<MenuState> emit) async {
+    if (!_checkOwnerPermission()) {
+      emit(MenuFailure(error: 'Hanya pemilik yang dapat mengambil foto'));
+      return;
+    }
+
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (photo != null) {
+        // Save to app directory
+        final savedPath = await _saveImageToAppDirectory(photo);
+        
+        emit(MenuImagePicked(
+          imagePath: savedPath,
+          menuId: event.menuId,
+        ));
+
+        // If menuId is provided, update the menu photo
+        if (event.menuId != null) {
+          await _menuRepository.updateFotoMenu(event.menuId!, savedPath);
+          
+          // Reload menu list
+          final menus = await _menuRepository.getAllMenu();
+          emit(MenuSuccess(
+            menus: menus,
+            message: 'Foto berhasil diambil dari kamera',
+          ));
+        }
+      }
+    } catch (e) {
+      emit(MenuFailure(error: 'Gagal mengambil foto: ${e.toString()}'));
+    }
+  }
+
+  // Pick image from gallery
+  Future<void> _onPickImageFromGallery(MenuPickImageFromGallery event, Emitter<MenuState> emit) async {
+    if (!_checkOwnerPermission()) {
+      emit(MenuFailure(error: 'Hanya pemilik yang dapat memilih foto'));
+      return;
+    }
+
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Save to app directory
+        final savedPath = await _saveImageToAppDirectory(image);
+        
+        emit(MenuImagePicked(
+          imagePath: savedPath,
+          menuId: event.menuId,
+        ));
+
+        // If menuId is provided, update the menu photo
+        if (event.menuId != null) {
+          await _menuRepository.updateFotoMenu(event.menuId!, savedPath);
+          
+          // Reload menu list
+          final menus = await _menuRepository.getAllMenu();
+          emit(MenuSuccess(
+            menus: menus,
+            message: 'Foto berhasil dipilih dari galeri',
+          ));
+        }
+      }
+    } catch (e) {
+      emit(MenuFailure(error: 'Gagal memilih foto: ${e.toString()}'));
+    }
+  }
+
+  // Save image to app directory
+  Future<String> _saveImageToAppDirectory(XFile imageFile) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final menuImagesDir = Directory('${directory.path}/menu_images');
+    
+    if (!await menuImagesDir.exists()) {
+      await menuImagesDir.create(recursive: true);
+    }
+
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(imageFile.path)}';
+    final savedImage = File('${menuImagesDir.path}/$fileName');
+    
+    await File(imageFile.path).copy(savedImage.path);
+    
+    return savedImage.path;
   }
 
   // Delete menu (Owner only)

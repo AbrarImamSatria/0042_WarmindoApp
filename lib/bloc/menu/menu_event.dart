@@ -44,6 +44,19 @@ final class MenuUpdateFoto extends MenuEvent {
     required this.fotoPath,
   });
 }
+// Pick image from camera
+final class MenuPickImageFromCamera extends MenuEvent {
+  final int? menuId; // null if for new menu
+
+  MenuPickImageFromCamera({this.menuId});
+}
+
+// Pick image from gallery
+final class MenuPickImageFromGallery extends MenuEvent {
+  final int? menuId; // null if for new menu
+
+  MenuPickImageFromGallery({this.menuId});
+}
 
 // Delete menu
 final class MenuDelete extends MenuEvent {
