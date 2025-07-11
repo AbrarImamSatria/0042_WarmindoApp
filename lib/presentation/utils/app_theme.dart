@@ -34,8 +34,8 @@ class AppTheme {
   static const Color qrisColor = primaryRed;
 
   // Category Colors
-  static const Color foodColor = primaryRed;
-  static const Color drinkColor = primaryYellow;
+  static const Color foodColor = Colors.orange;
+  static const Color drinkColor = Colors.blue;
 
   static ThemeData get lightTheme {
     return ThemeData(
