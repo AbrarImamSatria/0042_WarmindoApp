@@ -6,6 +6,9 @@ sealed class BackupEvent {}
 // Create backup
 final class BackupCreate extends BackupEvent {}
 
+// Load backup history
+final class BackupLoadHistory extends BackupEvent {}
+
 // Restore from backup
 final class BackupRestore extends BackupEvent {
   final String backupPath;
@@ -20,5 +23,9 @@ final class BackupShare extends BackupEvent {
   BackupShare({required this.backupPath});
 }
 
-// Export to JSON
-final class BackupExportJSON extends BackupEvent {}
+// Delete backup file
+final class BackupDelete extends BackupEvent {
+  final String backupPath;
+
+  BackupDelete({required this.backupPath});
+}

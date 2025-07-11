@@ -1,3 +1,4 @@
+// bloc/report/report_event.dart (UPDATED)
 part of 'report_bloc.dart';
 
 enum RevenuePeriod { today, month, custom }
@@ -8,7 +9,7 @@ sealed class ReportEvent {}
 // Load dashboard summary
 final class ReportLoadDashboard extends ReportEvent {}
 
-// Load revenue report
+// ✅ UPDATED: Load revenue report with date range
 final class ReportLoadRevenue extends ReportEvent {
   final RevenuePeriod period;
   final DateTime? startDate;
@@ -23,7 +24,7 @@ final class ReportLoadRevenue extends ReportEvent {
   });
 }
 
-// Load best selling items
+// ✅ UPDATED: Load best selling items with date range
 final class ReportLoadBestSelling extends ReportEvent {
   final int limit;
   final DateTime? startDate;
@@ -36,8 +37,27 @@ final class ReportLoadBestSelling extends ReportEvent {
   });
 }
 
-// Load payment method statistics
-final class ReportLoadPaymentStats extends ReportEvent {}
+// ✅ UPDATED: Load payment method statistics with date range
+final class ReportLoadPaymentStats extends ReportEvent {
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  ReportLoadPaymentStats({
+    this.startDate,
+    this.endDate,
+  });
+}
+
+// ✅ NEW: Load dashboard with date range
+final class ReportLoadDashboardWithDateRange extends ReportEvent {
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  ReportLoadDashboardWithDateRange({
+    this.startDate,
+    this.endDate,
+  });
+}
 
 // Export data
 final class ReportExportData extends ReportEvent {
@@ -49,6 +69,7 @@ final class ReportExportData extends ReportEvent {
     required this.endDate,
   });
 }
+
 // Generate Excel file
 final class ReportGenerateExcel extends ReportEvent {
   final DateTime startDate;
@@ -64,6 +85,23 @@ final class ReportGenerateExcel extends ReportEvent {
     this.includeTransactions = true,
     this.includeSalesByMenu = true,
     this.includeDailyRevenue = true,
+    this.includePaymentStats = true,
+  });
+}
+
+// Generate PDF file
+final class ReportGeneratePDF extends ReportEvent {
+  final DateTime startDate;
+  final DateTime endDate;
+  final bool includeTransactions;
+  final bool includeSalesByMenu;
+  final bool includePaymentStats;
+
+  ReportGeneratePDF({
+    required this.startDate,
+    required this.endDate,
+    this.includeTransactions = true,
+    this.includeSalesByMenu = true,
     this.includePaymentStats = true,
   });
 }

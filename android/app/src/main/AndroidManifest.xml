@@ -18,7 +18,7 @@
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDTZv2D8toK2RZLr7GRpwXZQJw6JLggPgs"/>
+            android:value="AIzaSyDibqZy4BQxwm3oM1BS57VmEEhKH_Ug1fU"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -49,5 +49,5 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-    </queries>
+    </queries>A
 </manifest>

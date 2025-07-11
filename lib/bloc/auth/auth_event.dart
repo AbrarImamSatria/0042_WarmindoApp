@@ -50,3 +50,9 @@ final class AuthChangePassword extends AuthEvent {
     required this.passwordBaru,
   });
 }
+
+class AuthUpdateUser extends AuthEvent {
+  final PenggunaModel user;
+
+  AuthUpdateUser({required this.user});
+}

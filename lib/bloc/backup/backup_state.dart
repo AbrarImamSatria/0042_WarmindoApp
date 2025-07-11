@@ -20,6 +20,13 @@ final class BackupSuccess extends BackupState {
   });
 }
 
+// Backup history loaded
+final class BackupLoaded extends BackupState {
+  final List<Map<String, dynamic>> backupHistory;
+
+  BackupLoaded({required this.backupHistory});
+}
+
 // Restore success
 final class BackupRestoreSuccess extends BackupState {
   final String message;
@@ -29,6 +36,13 @@ final class BackupRestoreSuccess extends BackupState {
 
 // Share success
 final class BackupShareSuccess extends BackupState {}
+
+// Delete success
+final class BackupDeleteSuccess extends BackupState {
+  final String message;
+
+  BackupDeleteSuccess({required this.message});
+}
 
 // Failure state
 final class BackupFailure extends BackupState {

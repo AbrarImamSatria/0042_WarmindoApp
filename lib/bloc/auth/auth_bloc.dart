@@ -1,8 +1,8 @@
+// auth_bloc.dart - Fixed version
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 import 'package:warmindo_app/data/model/pengguna_model.dart';
 import 'package:warmindo_app/data/repository/pengguna_repository.dart';
-
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -27,6 +27,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthUpdateProfile>(_onUpdateProfile);
     on<AuthUpdateAlamat>(_onUpdateAlamat);
     on<AuthChangePassword>(_onChangePassword);
+    on<AuthUpdateUser>(_onUpdateUser); // ← YANG INI HILANG! Sekarang sudah ditambahkan
   }
 
   // Handle login
@@ -34,7 +35,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     try {
       final user = await _penggunaRepository.login(event.nama, event.password);
-      
+
       if (user != null) {
         _currentUser = user;
         emit(AuthSuccess(user: user));
@@ -53,7 +54,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   // Check auth status
-  Future<void> _onCheckStatus(AuthCheckStatus event, Emitter<AuthState> emit) async {
+  Future<void> _onCheckStatus(
+    AuthCheckStatus event,
+    Emitter<AuthState> emit,
+  ) async {
     if (_currentUser != null) {
       emit(AuthSuccess(user: _currentUser!));
     } else {
@@ -62,17 +66,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   // Update profile
-  Future<void> _onUpdateProfile(AuthUpdateProfile event, Emitter<AuthState> emit) async {
+  Future<void> _onUpdateProfile(
+    AuthUpdateProfile event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       final success = await _penggunaRepository.updateProfile(event.user);
-      
+
       if (success) {
         _currentUser = event.user;
-        emit(AuthSuccess(
-          user: event.user,
-          message: 'Profile berhasil diupdate',
-        ));
+        emit(
+          AuthSuccess(user: event.user, message: 'Profile berhasil diupdate'),
+        );
       } else {
         emit(AuthFailure(error: 'Gagal update profile'));
       }
@@ -82,17 +88,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   // Update alamat
-  Future<void> _onUpdateAlamat(AuthUpdateAlamat event, Emitter<AuthState> emit) async {
+  Future<void> _onUpdateAlamat(
+    AuthUpdateAlamat event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
-      final success = await _penggunaRepository.updateAlamat(event.userId, event.alamat);
-      
+      final success = await _penggunaRepository.updateAlamat(
+        event.userId,
+        event.alamat,
+      );
+
       if (success && _currentUser != null) {
         _currentUser = _currentUser!.copyWith(alamat: event.alamat);
-        emit(AuthSuccess(
-          user: _currentUser!,
-          message: 'Alamat berhasil diupdate',
-        ));
+        emit(
+          AuthSuccess(user: _currentUser!, message: 'Alamat berhasil diupdate'),
+        );
       } else {
         emit(AuthFailure(error: 'Gagal update alamat'));
       }
@@ -102,7 +113,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   // Change password
-  Future<void> _onChangePassword(AuthChangePassword event, Emitter<AuthState> emit) async {
+  Future<void> _onChangePassword(
+    AuthChangePassword event,
+    Emitter<AuthState> emit,
+  ) async {
     emit(AuthLoading());
     try {
       final success = await _penggunaRepository.changePassword(
@@ -110,17 +124,35 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.passwordLama,
         event.passwordBaru,
       );
-      
+
       if (success) {
-        emit(AuthSuccess(
-          user: _currentUser!,
-          message: 'Password berhasil diubah',
-        ));
+        emit(
+          AuthSuccess(user: _currentUser!, message: 'Password berhasil diubah'),
+        );
       } else {
         emit(AuthFailure(error: 'Gagal mengubah password'));
       }
     } catch (e) {
       emit(AuthFailure(error: e.toString()));
+    }
+  }
+  
+  Future<void> _onUpdateUser(
+    AuthUpdateUser event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      // Update current user dengan data baru
+      _currentUser = event.user;
+      
+      // Emit state baru dengan user yang sudah diupdate
+      emit(AuthSuccess(user: event.user));
+    } catch (e) {
+      // Jika gagal, tetap emit state success dengan user lama
+      if (_currentUser != null) {
+        emit(AuthSuccess(user: _currentUser!));
+      }
+      print('Error updating user in AuthBloc: $e');
     }
   }
 }

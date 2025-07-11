@@ -113,7 +113,7 @@ class PosBloc extends Bloc<PosEvent, PosState> {
     }
   }
 
-  // Checkout
+  // ✅ IMPROVED Checkout method
   Future<void> _onCheckout(PosCheckout event, Emitter<PosState> emit) async {
     if (_cartItems.isEmpty) {
       emit(PosFailure(error: 'Keranjang belanja kosong'));
@@ -149,29 +149,36 @@ class PosBloc extends Bloc<PosEvent, PosState> {
       // Save transaction
       final transaksiId = await _transaksiRepository.createTransaksi(transaksi, items);
 
-      // Clear cart after successful checkout
-      _cartItems.clear();
-
+      // ✅ EMIT checkout success dengan navigation flag (JANGAN clear cart dulu)
       emit(PosCheckoutSuccess(
         transaksiId: transaksiId,
         totalAmount: transaksi.totalBayar,
+        shouldNavigateToDetail: true, // ✅ Flag untuk navigate ke detail
       ));
 
-      // Reload menu state
-      add(PosLoadMenu());
+      // ✅ JANGAN add(PosLoadMenu()) di sini, biarkan Cart Page yang handle
+      
     } catch (e) {
       emit(PosFailure(error: e.toString()));
       
-      // Return to menu loaded state with current cart
-      if (state is PosMenuLoaded) {
-        final currentState = state as PosMenuLoaded;
+      // Return to menu loaded state with current cart (DON'T clear cart on error)
+      try {
+        final menuGrouped = await _menuRepository.getMenuGroupedByCategory();
         emit(PosMenuLoaded(
-          menuByCategory: currentState.menuByCategory,
+          menuByCategory: menuGrouped,
           cartItems: Map.from(_cartItems),
           totalAmount: _calculateTotal(),
         ));
+      } catch (menuError) {
+        emit(PosFailure(error: 'Gagal memuat menu: $menuError'));
       }
     }
+  }
+
+  // ✅ ADD method untuk clear cart setelah navigation berhasil
+  void clearCartAfterCheckout() {
+    _cartItems.clear();
+    add(PosLoadMenu()); // Reload menu state dengan cart kosong
   }
 
   // Calculate total

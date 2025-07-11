@@ -1,26 +1,27 @@
+// profile_state.dart
 part of 'profile_bloc.dart';
 
 @immutable
 sealed class ProfileState {}
 
 // Initial state
-final class ProfileInitial extends ProfileState {}
+class ProfileInitial extends ProfileState {}
 
-// Loading state
-final class ProfileLoading extends ProfileState {}
+// Loading user profile
+class ProfileLoading extends ProfileState {}
 
-// Location loading state
-final class ProfileLocationLoading extends ProfileState {}
-
-// Profile loaded
-final class ProfileLoaded extends ProfileState {
+// Profile loaded successfully
+class ProfileLoaded extends ProfileState {
   final PenggunaModel user;
 
   ProfileLoaded({required this.user});
 }
 
-// Location loaded
-final class ProfileLocationLoaded extends ProfileState {
+// Loading location (GPS or geocoding)
+class ProfileLocationLoading extends ProfileState {}
+
+// Location loaded successfully with address
+class ProfileLocationLoaded extends ProfileState {
   final double latitude;
   final double longitude;
   final String address;
@@ -32,16 +33,16 @@ final class ProfileLocationLoaded extends ProfileState {
   });
 }
 
-// Update success
-final class ProfileUpdateSuccess extends ProfileState {
+// Alamat saved successfully
+class ProfileAlamatSaved extends ProfileState {
   final String message;
 
-  ProfileUpdateSuccess({required this.message});
+  ProfileAlamatSaved({required this.message});
 }
 
-// Failure state
-final class ProfileFailure extends ProfileState {
+// Error state
+class ProfileError extends ProfileState {
   final String error;
 
-  ProfileFailure({required this.error});
+  ProfileError({required this.error});
 }

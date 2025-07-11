@@ -40,10 +40,12 @@ final class PosCheckoutLoading extends PosState {}
 final class PosCheckoutSuccess extends PosState {
   final int transaksiId;
   final double totalAmount;
+  final bool shouldNavigateToDetail; // ✅ TAMBAH field ini
 
   PosCheckoutSuccess({
     required this.transaksiId,
     required this.totalAmount,
+    this.shouldNavigateToDetail = true, // ✅ Default true untuk navigate
   });
 }
 

@@ -1,3 +1,4 @@
+// profile_bloc.dart - Versi tanpa permission checking
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,128 +17,197 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ProfileBloc({required AuthBloc authBloc}) 
     : _authBloc = authBloc,
       super(ProfileInitial()) {
-    on<ProfileLoad>(_onLoad);
+    
+    // Register event handlers
+    on<ProfileLoad>(_onLoadProfile);
     on<ProfileGetCurrentLocation>(_onGetCurrentLocation);
     on<ProfileUpdateLocation>(_onUpdateLocation);
-    on<ProfileUpdateAlamat>(_onUpdateAlamat);
+    on<ProfileSaveAlamat>(_onSaveAlamat);
   }
 
-  // Load profile
-  Future<void> _onLoad(ProfileLoad event, Emitter<ProfileState> emit) async {
+  // Handler 1: Load user profile
+  Future<void> _onLoadProfile(ProfileLoad event, Emitter<ProfileState> emit) async {
     emit(ProfileLoading());
+    
     try {
+      // Get current user from AuthBloc
       final user = _authBloc.currentUser;
       if (user == null) {
-        throw Exception('User tidak terautentikasi');
+        emit(ProfileError(error: 'User tidak login'));
+        return;
       }
 
-      emit(ProfileLoaded(user: user));
+      // Ambil data terbaru dari database untuk memastikan alamat up-to-date
+      final updatedUser = await _penggunaRepository.getPenggunaById(user.id!);
+      if (updatedUser != null) {
+        // Update AuthBloc dengan data terbaru
+        _authBloc.add(AuthUpdateUser(user: updatedUser));
+        emit(ProfileLoaded(user: updatedUser));
+      } else {
+        emit(ProfileLoaded(user: user));
+      }
     } catch (e) {
-      emit(ProfileFailure(error: e.toString()));
+      emit(ProfileError(error: 'Gagal memuat profil: ${e.toString()}'));
     }
   }
 
-  // Get current location
+  // Handler 2: Get current GPS location (CLEANED - no permission check)
   Future<void> _onGetCurrentLocation(ProfileGetCurrentLocation event, Emitter<ProfileState> emit) async {
     emit(ProfileLocationLoading());
+    
     try {
-      // Check permission
+      // 1. Check if location service is enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception('Layanan lokasi tidak aktif');
+        emit(ProfileError(error: 'GPS tidak aktif. Silakan aktifkan GPS.'));
+        return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Izin lokasi ditolak');
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception('Izin lokasi ditolak permanen. Silakan aktifkan di pengaturan');
-      }
-
-      // Get current position
+      // 2. Langsung ambil posisi (permission sudah dicek di UI)
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
 
-      // Get address from coordinates
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
+      // 3. Convert coordinates to address
+      final address = await _getAddressFromCoordinates(
+        position.latitude, 
+        position.longitude
       );
 
-      String address = 'Lokasi tidak diketahui';
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        address = '${place.street}, ${place.subLocality}, ${place.locality}, ${place.subAdministrativeArea}, ${place.administrativeArea} ${place.postalCode}';
-      }
-
+      // 4. Emit location loaded
       emit(ProfileLocationLoaded(
         latitude: position.latitude,
         longitude: position.longitude,
         address: address,
       ));
+
     } catch (e) {
-      emit(ProfileFailure(error: e.toString()));
+      emit(ProfileError(error: 'Gagal mendapatkan lokasi: ${e.toString()}'));
     }
   }
 
-  // Update location from map selection
+  // Handler 3: Update location from map selection
   Future<void> _onUpdateLocation(ProfileUpdateLocation event, Emitter<ProfileState> emit) async {
     emit(ProfileLocationLoading());
+    
     try {
-      // Get address from coordinates
-      final placemarks = await placemarkFromCoordinates(
-        event.latitude,
-        event.longitude,
+      // Convert coordinates to address
+      final address = await _getAddressFromCoordinates(
+        event.latitude, 
+        event.longitude
       );
 
-      String address = 'Lokasi tidak diketahui';
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        address = '${place.street}, ${place.subLocality}, ${place.locality}, ${place.subAdministrativeArea}, ${place.administrativeArea} ${place.postalCode}';
-      }
-
+      // Emit location loaded
       emit(ProfileLocationLoaded(
         latitude: event.latitude,
         longitude: event.longitude,
         address: address,
       ));
+
     } catch (e) {
-      emit(ProfileFailure(error: e.toString()));
+      emit(ProfileError(error: 'Gagal mendapatkan alamat: ${e.toString()}'));
     }
   }
 
-  // Update alamat with coordinates
-  Future<void> _onUpdateAlamat(ProfileUpdateAlamat event, Emitter<ProfileState> emit) async {
+  // Handler 4: Save alamat to database
+  Future<void> _onSaveAlamat(ProfileSaveAlamat event, Emitter<ProfileState> emit) async {
     emit(ProfileLoading());
+    
     try {
+      // Get current user
       final user = _authBloc.currentUser;
       if (user == null) {
-        throw Exception('User tidak terautentikasi');
+        emit(ProfileError(error: 'User tidak login'));
+        return;
       }
 
-      // Format address with coordinates
-      final fullAddress = '${event.address}|${event.latitude},${event.longitude}';
+      // Format alamat: "address|latitude,longitude"
+      final formattedAddress = '${event.address}|${event.latitude},${event.longitude}';
       
-      // Update alamat
-      await _penggunaRepository.updateAlamat(user.id!, fullAddress);
+      // Save to database
+      final success = await _penggunaRepository.updateAlamat(user.id!, formattedAddress);
       
-      // Update auth bloc
-      _authBloc.add(AuthUpdateAlamat(
-        userId: user.id!,
-        alamat: fullAddress,
-      ));
+      if (success) {
+        // Update user di AuthBloc dengan alamat baru
+        final updatedUser = user.copyWith(alamat: formattedAddress);
+        _authBloc.add(AuthUpdateUser(user: updatedUser));
+        
+        emit(ProfileAlamatSaved(message: 'Alamat berhasil disimpan'));
+      } else {
+        emit(ProfileError(error: 'Gagal menyimpan alamat'));
+      }
 
-      emit(ProfileUpdateSuccess(
-        message: 'Alamat berhasil diupdate',
-      ));
     } catch (e) {
-      emit(ProfileFailure(error: e.toString()));
+      emit(ProfileError(error: 'Gagal menyimpan alamat: ${e.toString()}'));
+    }
+  }
+
+  // Helper method: Convert coordinates to readable address
+  Future<String> _getAddressFromCoordinates(double latitude, double longitude) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      
+      if (placemarks.isEmpty) {
+        return 'Alamat tidak ditemukan';
+      }
+
+      final place = placemarks.first;
+      
+      // Build address string
+      List<String> addressParts = [];
+      
+      if (place.street?.isNotEmpty == true) {
+        addressParts.add(place.street!);
+      }
+      if (place.subLocality?.isNotEmpty == true) {
+        addressParts.add(place.subLocality!);
+      }
+      if (place.locality?.isNotEmpty == true) {
+        addressParts.add(place.locality!);
+      }
+      if (place.administrativeArea?.isNotEmpty == true) {
+        addressParts.add(place.administrativeArea!);
+      }
+      if (place.postalCode?.isNotEmpty == true) {
+        addressParts.add(place.postalCode!);
+      }
+      
+      if (addressParts.isEmpty) {
+        return 'Alamat tidak ditemukan';
+      }
+      
+      return addressParts.join(', ');
+      
+    } catch (e) {
+      return 'Gagal mendapatkan alamat';
+    }
+  }
+
+  // Helper method: Parse saved address from user
+  Map<String, dynamic>? parseSavedAddress(String? alamat) {
+    if (alamat == null || alamat.isEmpty) return null;
+    
+    try {
+      final parts = alamat.split('|');
+      if (parts.length != 2) return null;
+      
+      final address = parts[0];
+      final coords = parts[1].split(',');
+      if (coords.length != 2) return null;
+      
+      final latitude = double.tryParse(coords[0]);
+      final longitude = double.tryParse(coords[1]);
+      
+      if (latitude == null || longitude == null) return null;
+      
+      return {
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+      };
+    } catch (e) {
+      return null;
     }
   }
 }

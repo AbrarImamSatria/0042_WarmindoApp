@@ -59,12 +59,24 @@ final class ReportExportReady extends ReportState {
     required this.endDate,
   });
 }
+
 // Excel generated
 final class ReportExcelGenerated extends ReportState {
   final String filePath;
   final String message;
 
   ReportExcelGenerated({
+    required this.filePath,
+    required this.message,
+  });
+}
+
+// ✅ TAMBAHAN: PDF generated
+final class ReportPDFGenerated extends ReportState {
+  final String filePath;
+  final String message;
+
+  ReportPDFGenerated({
     required this.filePath,
     required this.message,
   });

@@ -1,13 +1,9 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:bloc/bloc.dart';
 import 'package:meta/meta.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:warmindo_app/data/datasource/database_helper.dart';
-import 'package:warmindo_app/data/repository/menu_repository.dart';
-import 'package:warmindo_app/data/repository/pengguna_repository.dart';
-import 'package:warmindo_app/data/repository/transaksi_repository.dart';
 import '../auth/auth_bloc.dart';
 
 part 'backup_event.dart';
@@ -15,9 +11,6 @@ part 'backup_state.dart';
 
 class BackupBloc extends Bloc<BackupEvent, BackupState> {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
-  final MenuRepository _menuRepository = MenuRepository();
-  final TransaksiRepository _transaksiRepository = TransaksiRepository();
-  final PenggunaRepository _penggunaRepository = PenggunaRepository();
   final AuthBloc _authBloc;
 
   BackupBloc({required AuthBloc authBloc}) 
@@ -26,7 +19,8 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
     on<BackupCreate>(_onCreate);
     on<BackupRestore>(_onRestore);
     on<BackupShare>(_onShare);
-    on<BackupExportJSON>(_onExportJSON);
+    on<BackupLoadHistory>(_onLoadHistory);
+    on<BackupDelete>(_onDelete);
   }
 
   // Check owner permission
@@ -47,18 +41,12 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
       final dbPath = await _databaseHelper.getDatabasePath();
       final dbFile = File(dbPath);
       
-      // Get external storage directory (Documents folder)
-      Directory? backupDir;
-      if (Platform.isAndroid) {
-        // Android: /storage/emulated/0/Documents/WarmindoApp/Backups
-        final externalDir = await getExternalStorageDirectory();
-        final documentsPath = externalDir!.path.split('Android')[0];
-        backupDir = Directory('${documentsPath}Documents/WarmindoApp/Backups');
-      } else {
-        // iOS: Use application documents directory
-        final directory = await getApplicationDocumentsDirectory();
-        backupDir = Directory('${directory.path}/backups');
+      if (!await dbFile.exists()) {
+        throw Exception('Database tidak ditemukan');
       }
+
+      // Get backup directory
+      final backupDir = await _getBackupDirectory();
       
       if (!await backupDir.exists()) {
         await backupDir.create(recursive: true);
@@ -76,7 +64,55 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
         message: 'Backup berhasil dibuat di: ${backupDir.path}',
       ));
     } catch (e) {
-      emit(BackupFailure(error: e.toString()));
+      emit(BackupFailure(error: 'Gagal membuat backup: ${e.toString()}'));
+    }
+  }
+
+  // Load backup history
+  Future<void> _onLoadHistory(BackupLoadHistory event, Emitter<BackupState> emit) async {
+    if (!_checkOwnerPermission()) {
+      emit(BackupFailure(error: 'Hanya pemilik yang dapat melihat riwayat backup'));
+      return;
+    }
+
+    emit(BackupLoading());
+    try {
+      final backupDir = await _getBackupDirectory();
+      
+      if (!await backupDir.exists()) {
+        emit(BackupLoaded(backupHistory: []));
+        return;
+      }
+
+      final backupFiles = await backupDir
+          .list()
+          .where((entity) => entity is File && entity.path.endsWith('.db'))
+          .cast<File>()
+          .toList();
+
+      final backupHistory = <Map<String, dynamic>>[];
+      
+      for (final file in backupFiles) {
+        final stat = await file.stat();
+        final fileName = file.path.split('/').last;
+        
+        backupHistory.add({
+          'name': fileName,
+          'path': file.path,
+          'size': stat.size,
+          'created': stat.modified,
+          'formattedSize': _formatFileSize(stat.size),
+          'formattedDate': _formatDate(stat.modified),
+        });
+      }
+
+      // Sort by creation date (newest first)
+      backupHistory.sort((a, b) => 
+        (b['created'] as DateTime).compareTo(a['created'] as DateTime));
+
+      emit(BackupLoaded(backupHistory: backupHistory));
+    } catch (e) {
+      emit(BackupFailure(error: 'Gagal memuat riwayat backup: ${e.toString()}'));
     }
   }
 
@@ -95,23 +131,51 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
         throw Exception('File backup tidak ditemukan');
       }
 
+      // Validate backup file (check if it's a valid SQLite file)
+      final fileSize = await backupFile.length();
+      if (fileSize < 100) { // SQLite header is at least 100 bytes
+        throw Exception('File backup tidak valid atau kosong');
+      }
+
       // Get database path
       final dbPath = await _databaseHelper.getDatabasePath();
       
-      // Close current database
+      // Close current database connection
       await _databaseHelper.closeDatabase();
       
-      // Replace with backup
-      await backupFile.copy(dbPath);
-      
-      // Reopen database
-      await _databaseHelper.database;
+      // Create backup of current database before restore
+      final currentDbFile = File(dbPath);
+      if (await currentDbFile.exists()) {
+        final tempBackupPath = '${dbPath}.temp_backup';
+        await currentDbFile.copy(tempBackupPath);
+        
+        try {
+          // Replace with backup
+          await backupFile.copy(dbPath);
+          
+          // Test if restored database is valid by opening it
+          await _databaseHelper.database;
+          
+          // If successful, delete temp backup
+          await File(tempBackupPath).delete();
+          
+        } catch (e) {
+          // If restore failed, restore from temp backup
+          await File(tempBackupPath).copy(dbPath);
+          await File(tempBackupPath).delete();
+          throw Exception('File backup tidak kompatibel: ${e.toString()}');
+        }
+      } else {
+        // No existing database, just copy the backup
+        await backupFile.copy(dbPath);
+        await _databaseHelper.database;
+      }
 
       emit(BackupRestoreSuccess(
         message: 'Data berhasil direstore. Silakan login kembali.',
       ));
     } catch (e) {
-      emit(BackupFailure(error: e.toString()));
+      emit(BackupFailure(error: 'Gagal restore backup: ${e.toString()}'));
     }
   }
 
@@ -131,74 +195,70 @@ class BackupBloc extends Bloc<BackupEvent, BackupState> {
 
       await Share.shareXFiles(
         [XFile(event.backupPath)],
-        subject: 'Backup WarmindoApp',
+        subject: 'Backup WarmindoApp Database',
+        text: 'Backup database WarmindoApp dari ${_formatDate(DateTime.now())}',
       );
 
       emit(BackupShareSuccess());
     } catch (e) {
-      emit(BackupFailure(error: e.toString()));
+      emit(BackupFailure(error: 'Gagal share backup: ${e.toString()}'));
     }
   }
 
-  // Export to JSON
-  Future<void> _onExportJSON(BackupExportJSON event, Emitter<BackupState> emit) async {
+  // Delete backup file
+  Future<void> _onDelete(BackupDelete event, Emitter<BackupState> emit) async {
     if (!_checkOwnerPermission()) {
-      emit(BackupFailure(error: 'Hanya pemilik yang dapat export data'));
+      emit(BackupFailure(error: 'Hanya pemilik yang dapat menghapus backup'));
       return;
     }
 
     emit(BackupLoading());
     try {
-      // Get all data
-      final menus = await _menuRepository.getAllMenu();
-      final transactions = await _transaksiRepository.getAllTransaksi();
-      final users = await _penggunaRepository.getAllPengguna();
-
-      // Create JSON structure
-      final jsonData = {
-        'export_date': DateTime.now().toIso8601String(),
-        'app_version': '1.0.0',
-        'data': {
-          'menus': menus.map((m) => m.toMap()).toList(),
-          'transactions': transactions.map((t) => t.toMap()).toList(),
-          'users': users.map((u) => {
-            ...u.toMap(),
-            'password': '***' // Hide password in export
-          }).toList(),
-        }
-      };
-
-      // Get external storage directory
-      Directory? exportDir;
-      if (Platform.isAndroid) {
-        // Android: /storage/emulated/0/Documents/WarmindoApp/Exports
-        final externalDir = await getExternalStorageDirectory();
-        final documentsPath = externalDir!.path.split('Android')[0];
-        exportDir = Directory('${documentsPath}Documents/WarmindoApp/Exports');
+      final file = File(event.backupPath);
+      if (await file.exists()) {
+        await file.delete();
+        emit(BackupDeleteSuccess(message: 'Backup berhasil dihapus'));
       } else {
-        // iOS: Use application documents directory
-        final directory = await getApplicationDocumentsDirectory();
-        exportDir = Directory('${directory.path}/exports');
+        emit(BackupFailure(error: 'File backup tidak ditemukan'));
       }
-      
-      if (!await exportDir.exists()) {
-        await exportDir.create(recursive: true);
-      }
-
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.')[0];
-      final exportPath = '${exportDir.path}/export_warmindo_$timestamp.json';
-      final exportFile = File(exportPath);
-      
-      await exportFile.writeAsString(
-        const JsonEncoder.withIndent('  ').convert(jsonData),
-      );
-
-      emit(BackupSuccess(
-        backupPath: exportPath,
-        message: 'Data berhasil diexport ke: ${exportDir.path}',
-      ));
     } catch (e) {
-      emit(BackupFailure(error: e.toString()));
+      emit(BackupFailure(error: 'Gagal menghapus backup: ${e.toString()}'));
     }
+  }
+
+  // Get backup directory
+  Future<Directory> _getBackupDirectory() async {
+    if (Platform.isAndroid) {
+      // Try to use external storage first
+      try {
+        final externalDir = await getExternalStorageDirectory();
+        if (externalDir != null) {
+          final documentsPath = externalDir.path.split('Android')[0];
+          return Directory('${documentsPath}Documents/WarmindoApp/Backups');
+        }
+      } catch (e) {
+        // Fallback to app directory
+      }
+      
+      // Fallback to application documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      return Directory('${directory.path}/backups');
+    } else {
+      // iOS: Use application documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      return Directory('${directory.path}/backups');
+    }
+  }
+
+  // Helper method to format file size
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  // Helper method to format date
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
