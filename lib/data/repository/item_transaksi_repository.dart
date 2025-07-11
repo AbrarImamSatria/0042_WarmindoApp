@@ -5,7 +5,9 @@ class ItemTransaksiRepository {
   final ItemTransaksiDao _itemTransaksiDao = ItemTransaksiDao();
 
   // Get items by transaksi ID
-  Future<List<ItemTransaksiModel>> getItemsByTransaksiId(int transaksiId) async {
+  Future<List<ItemTransaksiModel>> getItemsByTransaksiId(
+    int transaksiId,
+  ) async {
     try {
       return await _itemTransaksiDao.getByTransaksiId(transaksiId);
     } catch (e) {
@@ -55,10 +57,12 @@ class ItemTransaksiRepository {
   Future<Map<String, dynamic>> getMenuPerformance(String namaMenu) async {
     try {
       final allItems = await _itemTransaksiDao.getAll();
-      
+
       // Filter by menu name
-      final menuItems = allItems.where((item) => item.namaMenu == namaMenu).toList();
-      
+      final menuItems = allItems
+          .where((item) => item.namaMenu == namaMenu)
+          .toList();
+
       if (menuItems.isEmpty) {
         return {
           'totalQuantity': 0,
@@ -97,11 +101,11 @@ class ItemTransaksiRepository {
   ) async {
     try {
       Map<String, Map<String, dynamic>> result = {};
-      
+
       for (String menuName in menuByCategory) {
         result[menuName] = await getMenuPerformance(menuName);
       }
-      
+
       return result;
     } catch (e) {
       throw Exception('Gagal mengambil performa kategori: ${e.toString()}');
@@ -114,8 +118,11 @@ class ItemTransaksiRepository {
     DateTime endDate,
   ) async {
     try {
-      final items = await _itemTransaksiDao.getSalesByMenuItem(startDate, endDate);
-      
+      final items = await _itemTransaksiDao.getSalesByMenuItem(
+        startDate,
+        endDate,
+      );
+
       // Add additional formatting for export
       return items.map((item) {
         return {
