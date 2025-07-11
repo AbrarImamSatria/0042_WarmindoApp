@@ -168,7 +168,7 @@ class PrintBloc extends Bloc<PrintEvent, PrintState> {
         ),
         pw.Center(
           child: pw.Text(
-            'Jl. Contoh No. 123, Yogyakarta',
+            'Tamantirto, Kasihan, Bantul.',
             style: const pw.TextStyle(fontSize: 10),
           ),
         ),
