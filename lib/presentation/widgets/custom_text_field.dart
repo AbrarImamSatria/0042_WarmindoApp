@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:warmindo_app/presentation/utils/app_theme.dart';
 
-
 class CustomTextField extends StatefulWidget {
   final String label;
   final String? hint;
@@ -47,6 +46,135 @@ class CustomTextField extends StatefulWidget {
 
   @override
   State<CustomTextField> createState() => _CustomTextFieldState();
+
+  // Factory constructors for common use cases
+  static Widget email({
+    required TextEditingController controller,
+    String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
+    TextInputAction? textInputAction,
+  }) {
+    return CustomTextField(
+      label: 'Email',
+      hint: 'Masukkan email Anda',
+      controller: controller,
+      keyboardType: TextInputType.emailAddress,
+      validator: validator ?? _emailValidator,
+      onChanged: onChanged,
+      textInputAction: textInputAction,
+      prefixIcon: const Icon(Icons.email_outlined),
+    );
+  }
+
+  static Widget password({
+    required TextEditingController controller,
+    TextInputAction? textInputAction,
+    VoidCallback? onEditingComplete, // Tambahkan ini
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: true,
+      textInputAction: textInputAction,
+      onEditingComplete: onEditingComplete, // Tambahkan ini
+      decoration: InputDecoration(
+        labelText: 'Kata Sandi',
+        hintText: 'Masukkan kata sandi',
+        prefixIcon: const Icon(Icons.lock_outline),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Kata sandi tidak boleh kosong';
+        }
+        return null;
+      },
+    );
+  }
+
+  static Widget currency({
+    required TextEditingController controller,
+    String? Function(String?)? validator,
+    ValueChanged<String>? onChanged,
+    String label = 'Harga',
+    String hint = 'Masukkan harga',
+  }) {
+    return CustomTextField(
+      label: label,
+      hint: hint,
+      controller: controller,
+      keyboardType: TextInputType.number,
+      validator: validator ?? _currencyValidator,
+      onChanged: onChanged,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        _CurrencyInputFormatter(),
+      ],
+      prefixIcon: const Padding(
+        padding: EdgeInsets.all(12.0),
+        child: Text(
+          'Rp',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  static Widget search({
+    required TextEditingController controller,
+    ValueChanged<String>? onChanged,
+    VoidCallback? onClear,
+    String hint = 'Cari...',
+  }) {
+    return CustomTextField(
+      label: '',
+      hint: hint,
+      controller: controller,
+      onChanged: onChanged,
+      prefixIcon: const Icon(Icons.search),
+      suffixIcon: controller.text.isNotEmpty
+          ? IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: () {
+                controller.clear();
+                onClear?.call();
+              },
+            )
+          : null,
+    );
+  }
+
+  // Validators
+  static String? _emailValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email tidak boleh kosong';
+    }
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(value)) {
+      return 'Email tidak valid';
+    }
+    return null;
+  }
+
+  static String? _passwordValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password tidak boleh kosong';
+    }
+    if (value.length < 6) {
+      return 'Password minimal 6 karakter';
+    }
+    return null;
+  }
+
+  static String? _currencyValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Harga tidak boleh kosong';
+    }
+    final cleanValue = value.replaceAll('.', '');
+    final price = int.tryParse(cleanValue);
+    if (price == null || price <= 0) {
+      return 'Harga tidak valid';
+    }
+    return null;
+  }
 }
 
 class _CustomTextFieldState extends State<CustomTextField> {
@@ -127,128 +255,6 @@ class _CustomTextFieldState extends State<CustomTextField> {
         ),
       ],
     );
-  }
-
-  // Factory constructors for common use cases
-  static Widget email({
-    required TextEditingController controller,
-    String? Function(String?)? validator,
-    ValueChanged<String>? onChanged,
-    TextInputAction? textInputAction,
-  }) {
-    return CustomTextField(
-      label: 'Email',
-      hint: 'Masukkan email Anda',
-      controller: controller,
-      keyboardType: TextInputType.emailAddress,
-      validator: validator ?? _emailValidator,
-      onChanged: onChanged,
-      textInputAction: textInputAction,
-      prefixIcon: const Icon(Icons.email_outlined),
-    );
-  }
-
-  static Widget password({
-    required TextEditingController controller,
-    String? Function(String?)? validator,
-    ValueChanged<String>? onChanged,
-    TextInputAction? textInputAction,
-    String label = 'Password',
-    String hint = 'Masukkan password',
-  }) {
-    return CustomTextField(
-      label: label,
-      hint: hint,
-      controller: controller,
-      obscureText: true,
-      validator: validator ?? _passwordValidator,
-      onChanged: onChanged,
-      textInputAction: textInputAction,
-      prefixIcon: const Icon(Icons.lock_outline),
-    );
-  }
-
-  static Widget currency({
-    required TextEditingController controller,
-    String? Function(String?)? validator,
-    ValueChanged<String>? onChanged,
-    String label = 'Harga',
-    String hint = 'Masukkan harga',
-  }) {
-    return CustomTextField(
-      label: label,
-      hint: hint,
-      controller: controller,
-      keyboardType: TextInputType.number,
-      validator: validator ?? _currencyValidator,
-      onChanged: onChanged,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        _CurrencyInputFormatter(),
-      ],
-      prefixIcon: const Padding(
-        padding: EdgeInsets.all(12.0),
-        child: Text('Rp', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
-
-  static Widget search({
-    required TextEditingController controller,
-    ValueChanged<String>? onChanged,
-    VoidCallback? onClear,
-    String hint = 'Cari...',
-  }) {
-    return CustomTextField(
-      label: '',
-      hint: hint,
-      controller: controller,
-      onChanged: onChanged,
-      prefixIcon: const Icon(Icons.search),
-      suffixIcon: controller.text.isNotEmpty
-          ? IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                controller.clear();
-                onClear?.call();
-              },
-            )
-          : null,
-    );
-  }
-
-  // Validators
-  static String? _emailValidator(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Email tidak boleh kosong';
-    }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Email tidak valid';
-    }
-    return null;
-  }
-
-  static String? _passwordValidator(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password tidak boleh kosong';
-    }
-    if (value.length < 6) {
-      return 'Password minimal 6 karakter';
-    }
-    return null;
-  }
-
-  static String? _currencyValidator(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Harga tidak boleh kosong';
-    }
-    final cleanValue = value.replaceAll('.', '');
-    final price = int.tryParse(cleanValue);
-    if (price == null || price <= 0) {
-      return 'Harga tidak valid';
-    }
-    return null;
   }
 }
 
